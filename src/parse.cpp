@@ -20,7 +20,7 @@ void Parser::Parse(){
         std::string temp;
         if(i + 1 == pos.size()){
             temp = buf.substr(pos[i]);
-            std::cout << temp << std::endl;
+            //std::cout << temp << std::endl;
         }else{
             temp = buf.substr(pos[i], pos[i+1]-pos[i]);
         }
@@ -38,7 +38,7 @@ void Parser::Parse(){
                         //std::cout << "str len is " << str_len << std::endl;
                         std::string cmd = temp.substr(k + 2, str_len);
                         //std::cout << j + str_len + 3 << std::endl;
-                        std::cout << "cmd is " << cmd << std::endl;
+                        //std::cout << "cmd is " << cmd << std::endl;
                         cmds_.push_back(cmd);
                         break;
                     }else if(temp.substr(k, 2) == "\r\n" && count == 2){ 
@@ -60,7 +60,6 @@ void Parser::Parse(){
         }
         args_.push_back(args);
     }
-
     this->cmds = cmds_;
     this->keys = keys_;
     this->args = args_;

@@ -12,7 +12,7 @@ class HundunDB{
         ~HundunDB();
         std::string Get(std::string key);
         int Put(std::string key, std::string value);
-        char* Handler(char* buf);
+        std::string Handler(std::string buf);
         void Start();
     private:
         rocksdb::Status s;

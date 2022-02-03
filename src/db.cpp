@@ -47,14 +47,12 @@ int HundunDB::Put(std::string key, std::string value){
     return -1;
 }
 
-char* HundunDB::Handler(char* buf){
-    std::string str(buf);
-    Parser* parser = new Parser(str);
+std::string HundunDB::Handler(std::string buf){
+    Parser* parser = new Parser(buf);
     parser->Parse();
     std::vector<std::string> cmds = parser->Cmds();
     std::vector<std::string> keys = parser->Keys();
     std::vector<std::vector<std::string>> args = parser->Args();
-    return buf;
 
     // for(int i = 0; i < cmds.size(); i++){
     //     std::cout << "cmd is " << cmds[i] << std::endl;
@@ -69,16 +67,16 @@ char* HundunDB::Handler(char* buf){
     //     }
     // }
 
-    std::string result;
+    std::string result = "";
     int j = 0, k = 0;
     for(int i = 0; i < cmds.size(); i++){
         std::string cmd = cmds[i];
         //transform string into lower case...
         std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c){ return std::tolower(c);});
-        //std::cout << "lower case cmd is " << cmd << std::endl;
+        std::cout << "lower case cmd is " << cmd << std::endl;
         if(cmd == "get"){
             std::string value = this->Get(keys[k]);
-            //std::cout << "value is" << std::endl;
+            std::cout << "value is" << std::endl;
             if(value == "\0"){
                 result += "$-1\r\n";
                 continue;
@@ -108,11 +106,11 @@ char* HundunDB::Handler(char* buf){
         // TODO, add more redis command...
         // }
         else{
-            std::string ret = "-ERR unknown command " + cmds[i] + " \r\n";
+            std::string ret = "-ERR unknown command\r\n";
             result += ret;
         }
     }
-    return &result[0];
+    return result;
 }
 
 

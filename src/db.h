@@ -7,8 +7,8 @@
 
 class HundunDB{
     public:
-        HundunDB(int Port = 8080);
-        HundunDB(rocksdb::DB* db_, int Port = 8080);
+        HundunDB(std::string data_path = "data/");
+        HundunDB(rocksdb::DB* db_);
         ~HundunDB();
         std::string Get(std::string key);
         int Put(std::string key, std::string value);

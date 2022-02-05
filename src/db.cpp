@@ -1,5 +1,6 @@
 #include "db.h"
 #include "parse.h"
+#include "../utils/utils.h"
 #include <vector>
 
 HundunDB::HundunDB(std::string data_path){
@@ -34,12 +35,16 @@ std::string HundunDB::Get(std::string key){
     // get value
     s = db->Get(rocksdb::ReadOptions(), key, &value);
     if(s.ok()){
-        return value;
+        int pos = value.find("&&");
+        return value.substr(0, pos);
     }
     return "\0";
 }
 
 int HundunDB::Put(std::string key, std::string value){
+    key += "&&";
+    key += std::to_string(GetTimeMillSeconds());
+    key += "&&";
     s = db->Put(rocksdb::WriteOptions(), key, value);
     if(s.ok()){
         return 1;

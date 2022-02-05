@@ -5,79 +5,69 @@
 
 #include <cstdio>
 #include <string>
+#include <iostream>
+#include <unistd.h>
 
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
+#include "../utils/utils.h"
 
 using namespace ROCKSDB_NAMESPACE;
 
-std::string kDBPath = "../data";
+std::string kDBPath = "data/";
 
 int main() {
-  DB* db;
-  Options options;
-  // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-  options.IncreaseParallelism();
-  options.OptimizeLevelStyleCompaction();
-  // create the DB if it's not already present
-  options.create_if_missing = true;
+    DB* db;
+    Options options;
+    // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
+    options.IncreaseParallelism();
+    options.OptimizeLevelStyleCompaction();
+    // create the DB if it's not already present
+    options.create_if_missing = true;
 
-  // open DB
-  Status s = DB::Open(options, kDBPath, &db);
-  assert(s.ok());
+    // open DB
+    Status s = DB::Open(options, kDBPath, &db);
+    assert(s.ok());
 
-  // Put key-value
-  s = db->Put(WriteOptions(), "key1", "value");
-  assert(s.ok());
-  std::string value;
-  // get value
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.ok());
-  assert(value == "value");
+    std::string value;
+    int i = 0;
+    while(i < 1000){
+      // Put key-value
+      std::string key = "key";
+      key += std::to_string(i);
+      std::string value1 = "value";
+      s = db->Put(WriteOptions(), key, value1);
+      s = db->Delete(rocksdb::WriteOptions(), key);
+      // get value
+      i++;
+    }
+    
+    std::unique_ptr<TransactionLogIterator> iter;
 
-  // atomically apply a set of updates
-  {
-    WriteBatch batch;
-    batch.Delete("key1");
-    batch.Put("key2", value);
-    s = db->Write(WriteOptions(), &batch);
+    //s = db->GetUpdatesSince(db->GetLatestSequenceNumber() - 1000000, &iter);
+    s = db->GetUpdatesSince(db->GetLatestSequenceNumber() - 2000, &iter);
+    if(!s.ok()){
+      std::cout << "failed to get update since seq number" << std::endl;
+      return -1;
+    }
+    
+    int count = 0;
+    while(iter->Valid()){
+      auto result = iter->GetBatch();
+      std::cout << "seq num is " << result.sequence << std::endl;
+      auto data = result.writeBatchPtr->Data();
+      std::cout << (data[12]) << std::endl;
+      int data_size = result.writeBatchPtr->GetDataSize();
+      std::cout << "data size is " << data_size << std::endl;
+      std::cout << "data is " << data << std::endl;
+      iter->Next();
+      count++;
+    }
+
+    std::cout << "count is " << count << std::endl;
+
+    delete db;
+
+    return 0;
   }
-
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.IsNotFound());
-
-  db->Get(ReadOptions(), "key2", &value);
-  assert(value == "value");
-
-  {
-    PinnableSlice pinnable_val;
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-    assert(pinnable_val == "value");
-  }
-
-  {
-    std::string string_val;
-    // If it cannot pin the value, it copies the value to its internal buffer.
-    // The intenral buffer could be set during construction.
-    PinnableSlice pinnable_val(&string_val);
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-    assert(pinnable_val == "value");
-    // If the value is not pinned, the internal buffer must have the value.
-    assert(pinnable_val.IsPinned() || string_val == "value");
-  }
-
-  PinnableSlice pinnable_val;
-  db->Get(ReadOptions(), db->DefaultColumnFamily(), "key1", &pinnable_val);
-  assert(s.IsNotFound());
-  // Reset PinnableSlice after each use and before each reuse
-  pinnable_val.Reset();
-  db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-  assert(pinnable_val == "value");
-  pinnable_val.Reset();
-  // The Slice pointed by pinnable_val is not valid after this point
-
-  delete db;
-
-  return 0;
-}

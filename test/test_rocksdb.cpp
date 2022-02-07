@@ -11,8 +11,7 @@
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
-#include "../utils/utils.h"
-
+#include "../src/utils.h"
 using namespace ROCKSDB_NAMESPACE;
 
 std::string kDBPath = "data/";
@@ -31,14 +30,17 @@ int main() {
     assert(s.ok());
 
     std::string value;
-    int i = 0;
+    int i = 1;
     while(i < 1000){
       // Put key-value
       std::string key = "key";
       key += std::to_string(i);
+      key += "&&";
+      key += "123456789";
+      key += "&&";
       std::string value1 = "value";
+
       s = db->Put(WriteOptions(), key, value1);
-      s = db->Delete(rocksdb::WriteOptions(), key);
       // get value
       i++;
     }
@@ -51,21 +53,23 @@ int main() {
       std::cout << "failed to get update since seq number" << std::endl;
       return -1;
     }
-    
-    int count = 0;
+
+    int j = 0;
     while(iter->Valid()){
       auto result = iter->GetBatch();
       std::cout << "seq num is " << result.sequence << std::endl;
       auto data = result.writeBatchPtr->Data();
-      std::cout << (data[12]) << std::endl;
+      std::cout << "data is " << data << std::endl;
       int data_size = result.writeBatchPtr->GetDataSize();
       std::cout << "data size is " << data_size << std::endl;
-      std::cout << "data is " << data << std::endl;
-      iter->Next();
-      count++;
-    }
+      auto kv = GetKvPair(data, data_size);
 
-    std::cout << "count is " << count << std::endl;
+      std::cout << "key is " << (kv[0] == "key998&&123456789&&")<< std::endl;
+      std::cout << "value is " << kv[1] << std::endl;
+      
+      iter->Next();
+      j++;
+    }
 
     delete db;
 

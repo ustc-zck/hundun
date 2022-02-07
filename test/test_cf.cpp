@@ -5,16 +5,15 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <iostream>
+#include<cstdio>
 
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
 
-#if defined(OS_WIN)
-std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_column_families_example";
-#else
-std::string kDBPath = "/tmp/rocksdb_column_families_example";
-#endif
+
+std::string kDBPath = "data/";
 
 using ROCKSDB_NAMESPACE::ColumnFamilyDescriptor;
 using ROCKSDB_NAMESPACE::ColumnFamilyHandle;
@@ -27,6 +26,8 @@ using ROCKSDB_NAMESPACE::Slice;
 using ROCKSDB_NAMESPACE::Status;
 using ROCKSDB_NAMESPACE::WriteBatch;
 using ROCKSDB_NAMESPACE::WriteOptions;
+
+using namespace ROCKSDB_NAMESPACE;
 
 int main() {
   // open DB
@@ -72,6 +73,26 @@ int main() {
   batch.Delete(handles[0], Slice("key"));
   s = db->Write(WriteOptions(), &batch);
   assert(s.ok());
+
+  std::unique_ptr<TransactionLogIterator> iter;
+
+  //s = db->GetUpdatesSince(db->GetLatestSequenceNumber() - 1000000, &iter);
+  s = db->GetUpdatesSince(db->GetLatestSequenceNumber() - 2000, &iter);
+  if(!s.ok()){
+    std::cout << "failed to get update since seq number" << std::endl;
+    return -1;
+  }
+  
+  int count = 0;
+  while(iter->Valid()){
+    auto result = iter->GetBatch();
+    std::cout << "seq num is " << result.sequence << std::endl;
+    std::string data = result.writeBatchPtr->Data();
+    printf(data.c_str());
+    std::cout << std::endl;
+    iter->Next();
+    count++;
+  }
 
   // drop column family
   s = db->DropColumnFamily(handles[1]);

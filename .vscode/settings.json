@@ -62,6 +62,8 @@
         "regex": "cpp",
         "future": "cpp",
         "iomanip": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "hiredis.h": "c",
+        "netfwd": "cpp"
     }
 }

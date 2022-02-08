@@ -41,3 +41,16 @@ int64_t GetTimeSeconds(){
 int64_t GetTimeMillSeconds(){
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
+
+std::string GetLocalIp(){
+    char host[256];
+    char *IP;
+    struct hostent *host_entry;
+    int hostname;
+    hostname = gethostname(host, sizeof(host)); //find the host name
+    host_entry = gethostbyname(host); //find host information
+    IP = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0])); //Convert into IP string
+    std::string ip(IP);
+    return ip;
+}
+

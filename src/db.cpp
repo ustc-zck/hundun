@@ -1,6 +1,6 @@
 #include "db.h"
 
-HundunDB::HundunDB(std::string data_path){
+HundunDB::HundunDB(std::string data_path, int Port){
     rocksdb::Options options;
     // Optimize RocksDB...
     options.IncreaseParallelism();
@@ -12,9 +12,10 @@ HundunDB::HundunDB(std::string data_path){
     assert(s.ok());
     role = "slave";
     seq_num = db->GetLatestSequenceNumber();
+    port = Port;
 }
 
-HundunDB::HundunDB(rocksdb::DB* db_){
+HundunDB::HundunDB(rocksdb::DB* db_, int Port){
     rocksdb::Options options;
     // Optimize RocksDB...
     options.IncreaseParallelism();
@@ -25,9 +26,12 @@ HundunDB::HundunDB(rocksdb::DB* db_){
     db = db_;
     role = "slave";
     seq_num = db->GetLatestSequenceNumber();
+    port = Port;
 }
 
 HundunDB::~HundunDB(){
+    redisFree(conn);
+    freeReplyObject(reply);
     delete db;
 }
 
@@ -78,7 +82,9 @@ int HundunDB::Put(std::string key, std::string value){
             auto key_ = iter->key().ToString();
             auto time_ = GetTimeFromKey(key_);
             if(time_ < time){
-                db->Delete(rocksdb::WriteOptions(), iter->key());
+                rocksdb::WriteOptions write_options;
+                write_options.disableWAL = true;
+                db->Delete(write_options, iter->key());
             }else{
                 return 0;
             }
@@ -101,14 +107,16 @@ int HundunDB::DelPrefix(std::string prefix){
     prefix += "&&";
     iter->Seek(prefix);  
     std::string value;
+    rocksdb::WriteOptions write_options;
+    write_options.disableWAL = true;
     if(iter->Valid()){
         auto key = iter->key().ToString();
-        s = db->Delete(rocksdb::WriteOptions(), key);
+        s = db->Delete(write_options, key);
         if(!s.ok()){
-            std::cout << "failed to delete prefix" << std::endl;
+            //std::cout << "failed to delete prefix" << std::endl;
             return -1;
         }
-        std::cout << "delete key: " << key << std::endl;
+        //std::cout << "delete key: " << key << std::endl;
     }
     return 0;
 }
@@ -158,32 +166,34 @@ std::string HundunDB::Handler(std::string buf){
             //set as master...
             if(keys[k] == "no" && args[j][0] == "one"){
                 this->SetMaster();
+                result += "+OK\r\n";
             } else if (keys[k] != "no" && args[j][0] != "one"){
-                std::string master_addr = keys[k] + ":" + args[j][0];
-                redisContext *conn;
-                redisReply *reply;
-                //0.5 seconds.
+                std::string new_master_addr = keys[k] + ":" + args[j][0];
+                std::cout << "new master addr is " << new_master_addr << std::endl;
+                //0.5 seconds...
                 struct timeval timeout = {0, 500000}; 
                 conn = redisConnectWithTimeout(keys[k].c_str(),  std::stoi(args[j][0]), timeout);
                 if (conn == NULL || conn->err) {
                     if (conn) {
                         std::cout << "Connection error: " << conn->errstr << std::endl;
-                        redisFree(conn);
                     }
                     else {
                         std::cout << "Connection error: can't allocate redis context" << std::endl;
                     }
                     continue;
                 }
-                void* ret = redisCommand(conn, "addslave %s", master_addr);
+                std::string local_ip = "127.0.0.1";
+                std::string this_slave_addr = local_ip + ":" + std::to_string(port);
+                std::cout << "this slave addr is " << this_slave_addr << std::endl;
+                std::string cmd = "addslave " + local_ip;
+                void* ret = redisCommand(conn, cmd);
                 reply = static_cast<redisReply*>(ret);
                 if(reply->str == "OK"){
                     result += "+OK\r\n";
+                    master_addr = new_master_addr;
                 } else {
                     result += "-ERR slave of error\r\n";
                 }
-                redisFree(conn);
-                freeReplyObject(reply);
             } else{
                 result += "-ERR server put error\r\n";
             }
@@ -193,6 +203,17 @@ std::string HundunDB::Handler(std::string buf){
         else if(cmd == "addslave"){
             this->AddSlave(keys[k]);
             k++;
+            result += "+OK\r\n";
+        }
+        else if(cmd == "getseqnum"){
+            seq_num = db->GetLatestSequenceNumber();
+            std::string seq_num_str = std::to_string(seq_num);
+            std::string tmp;
+            tmp += "$";
+            //std::cout << "value length is " << value.length() << std::endl;
+            tmp += std::to_string(seq_num_str.length());
+            tmp += "\r\n" + seq_num_str + "\r\n";
+            result += tmp;
         }
         else{
             std::string ret = "-ERR unknown command\r\n";
@@ -203,10 +224,23 @@ std::string HundunDB::Handler(std::string buf){
 }
 
 void HundunDB::Sync(){
-    //TODO，sync seq num...
-    //master request seq num from slaves...
-
     if(role == "master"){
+        //sync seq num...
+        for(auto iter = seq_num_of_slaves.begin(); iter != seq_num_of_slaves.end(); iter++){
+            std::string addr = iter->first;
+            std::string ip = addr.substr(0, addr.find(":"));
+            int port = std::stoi(addr.substr(addr.find(":") + 1)); 
+            struct timeval timeout = {0, 500000}; 
+            conn = redisConnectWithTimeout(ip.c_str(), port, timeout);
+            void* ret = redisCommand(conn, "getseqnum");
+            reply = static_cast<redisReply*>(ret);
+            if(reply->str != ""){
+                uint64_t seq_num_slave = std::stol(reply->str);
+                seq_num_of_slaves[addr] = seq_num_slave;
+            }
+        }
+
+        //replicat data to remote slave...
         seq_num = db->GetLatestSequenceNumber();
         for(auto iter = seq_num_of_slaves.begin(); iter != seq_num_of_slaves.end(); iter++){
             std::string addr = iter->first;
@@ -220,15 +254,12 @@ void HundunDB::Sync(){
                 if(!s.ok()){
                     continue;
                 }
-                redisContext *conn;
-                redisReply *reply;
                 //0.5 seconds.
                 struct timeval timeout = {0, 500000}; 
                 conn = redisConnectWithTimeout(ip.c_str(), port, timeout);
                 if (conn == NULL || conn->err) {
                     if (conn) {
                         std::cout << "Connection error: " << conn->errstr << std::endl;
-                        redisFree(conn);
                     }
                     else {
                         std::cout << "Connection error: can't allocate redis context" << std::endl;
@@ -249,8 +280,6 @@ void HundunDB::Sync(){
                         break;
                     }
                 }
-                redisFree(conn);
-                freeReplyObject(reply);
             } else if(seq_num < this_seq_num){
                     //TODO, consider the condition that seq num of slave is larger than master's seq num...
             } else {

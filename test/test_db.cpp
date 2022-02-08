@@ -9,7 +9,7 @@ int main(){
     // std::string value = hundun_db->Get("hello");
     // std::cout << "value is " << value << std::endl;
     //*3\r\n$3\r\nset\r\n$1\r\nb\r\n$1\r\n2\r\n
-    std::string s1 = hundun_db->Handler("*2\r\n$3\r\nget\r\n$1\r\nb\r\n");
+    std::string s1 = hundun_db->Handler("*3\r\n$3\r\nset\r\n$1\r\nb\r\n$1\r\n2\r\n");
     std::cout << s1<< std::endl;
 
     return 0;

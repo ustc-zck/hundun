@@ -22,11 +22,11 @@ int main(int argc, char **argv) {
         exit(1);
      }
      /* Set */
-     reply = redisCommand(conn,"SET %s %s", "welcome", "Hello, DCS for Redis!");
-     printf("SET: %s\n", reply->str);
-     reply = redisCommand(conn, "GET welcome");
-     printf("Value is: %s\n", reply->str);
+     reply = redisCommand(conn, "slaveof no one");
+     printf("reply: %s\n", reply->str);
+     reply = redisCommand(conn, "slaveof 127.0.0.1 9000");
      freeReplyObject(reply);
      redisFree(conn);
      return 0;
 }
+

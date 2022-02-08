@@ -12,8 +12,8 @@
 
 class HundunDB{
     public:
-        HundunDB(std::string data_path = "data/");
-        HundunDB(rocksdb::DB* db_);
+        HundunDB(std::string data_path = "data/", int Port = 8080);
+        HundunDB(rocksdb::DB* db_, int Port = 8080);
         ~HundunDB();
         std::string Get(std::string key);
         int Put(std::string key, std::string value);
@@ -42,11 +42,32 @@ class HundunDB{
             master_addr = new_master_addr;
             seq_num_of_slaves.clear();
         }
+        
+        rocksdb::DB* GetRocksDb(){
+            return db;
+        }
+
+        std::string Role(){
+            return role;
+        }
+
+        std::string MasterAddr(){
+            return master_addr;
+        }
+
+        std::unordered_map<std::string, uint64_t> SeqNumOfSlaves(){
+            return seq_num_of_slaves;
+        }
+        
+        int Port(){
+            return port;
+        }
         void Sync();
 
     private:
         rocksdb::Status s;
         rocksdb::DB* db;
+        int port;
         //"master" or "slave"...
         std::string role;
         //if master, master addr is self...
@@ -56,4 +77,7 @@ class HundunDB{
         uint64_t seq_num;
         //seq num of each slave...
         std::unordered_map<std::string, uint64_t> seq_num_of_slaves; 
+        //hiredis...
+        redisContext *conn;
+        redisReply *reply;
 };

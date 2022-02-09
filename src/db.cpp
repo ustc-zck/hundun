@@ -182,7 +182,7 @@ std::string HundunDB::Handler(std::string buf){
                     }
                     continue;
                 }
-                std::string local_ip = "127.0.0.1";
+                std::string local_ip = GetLocalIp();
                 std::string this_slave_addr = local_ip + ":" + std::to_string(port);
                 std::cout << "this slave addr is " << this_slave_addr << std::endl;
                 std::string cmd = "addslave " + this_slave_addr;

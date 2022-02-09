@@ -3,23 +3,23 @@
 #include "utils.h"
 
 
-std::string GetPrefixFromKey(std::string key){
-    int pos_first = key.find("&&");
-    return key.substr(0, pos_first);
-}
+// std::string GetPrefixFromKey(std::string key){
+//     int pos_first = key.find("&&");
+//     return key.substr(0, pos_first);
+// }
 
-int64_t GetTimeFromKey(std::string key){
-    int pos_first = key.find("&&");
-    int pos_last = key.find_last_of("&&");
-    std::string time = key.substr(pos_first + 2, pos_last - pos_first);
-    return std::stol(time);
-}
+// int64_t GetTimeFromKey(std::string key){
+//     int pos_first = key.find("&&");
+//     int pos_last = key.find_last_of("&&");
+//     std::string time = key.substr(pos_first + 2, pos_last - pos_first);
+//     return std::stol(time);
+// }
 
 //TODO, parse wal log...now only support set operation...
 std::vector<std::string> GetKvPair(std::string data, int data_size){
     auto s = data.substr(14, data_size);
-    int pos = s.find_last_of("&&");
-    std::string key = s.substr(0, pos+1);
+    int pos = s.find_first_of("&&");
+    std::string key = s.substr(0, pos);
     std::string val = s.substr(pos + 2);
     val.erase(val.find_last_not_of(' ')+1); 
     val.erase(0, val.find_first_not_of(' '));

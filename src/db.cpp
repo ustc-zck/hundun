@@ -35,67 +35,95 @@ HundunDB::~HundunDB(){
     delete db;
 }
 
+// std::string HundunDB::Get(std::string key){
+//     rocksdb::ReadOptions read_options;
+//     read_options.total_order_seek = false;
+//     read_options.prefix_same_as_start = true;
+//     rocksdb::Iterator* iter = db->NewIterator(read_options);
+//     key += "&&";
+//     iter->Seek(key);  
+//     std::string value;
+//     if(iter->Valid()){
+//         auto val = iter->value().ToString();
+//         std::cout << "val is " << val << std::endl;
+//         return val;
+//     }
+//     // get value
+//     //s = db->Get(rocksdb::ReadOptions(), key, &value);
+//     // if(s.ok()){
+//     //     int pos = value.find("&&");
+//     //     return value.substr(0, pos);
+//     // }
+//     return "\0";
+// }
+
+
+// int HundunDB::Put(std::string key, std::string value){
+//     if(key.find("&&") == std::string::npos){
+//         if(this->DelPrefix(key) < 0){
+//             return -1;
+//         }
+//         key += "&&";
+//         key += std::to_string(GetTimeMillSeconds());
+//         key += "&&";
+//         s = db->Put(rocksdb::WriteOptions(), key, value);
+//         if(s.ok()){
+//             return 1;
+//         }
+//     } else{
+//         auto prefix = GetPrefixFromKey(key);
+//         std::cout << "prefix is " << prefix << std::endl;
+//         auto time = GetTimeFromKey(key);
+//         std::cout << "time is " << time << std::endl;
+//         rocksdb::ReadOptions read_options;
+//         read_options.total_order_seek = false;
+//         read_options.prefix_same_as_start = true;
+//         rocksdb::Iterator* iter = db->NewIterator(read_options);
+//         prefix += "&&";
+//         iter->Seek(prefix);  
+//         std::string value;
+//         if(iter->Valid()){
+//             auto key_ = iter->key().ToString();
+//             auto time_ = GetTimeFromKey(key_);
+//             std::cout << "start to delete key..." << std::endl;
+//             if(time_ < time){
+//                 rocksdb::WriteOptions write_options;
+//                 write_options.disableWAL = true;
+//                 s = db->Delete(write_options, iter->key());
+//                 std::cout << "delete key " << iter->key().ToString() << std::endl;
+//                 if(!s.ok()){
+//                     return -1;
+//                 }
+//             }else{
+//                 return 0;
+//             }
+//             iter->Next();
+//         }
+//         s = db->Put(rocksdb::WriteOptions(), key, value);
+//         if(s.ok()){
+//             return 1;
+//         }
+//     }
+    
+//     return -1;
+// }
+
 std::string HundunDB::Get(std::string key){
-    rocksdb::ReadOptions read_options;
-    read_options.total_order_seek = false;
-    read_options.prefix_same_as_start = true;
-    rocksdb::Iterator* iter = db->NewIterator(read_options);
-    key += "&&";
-    iter->Seek(key);  
     std::string value;
-    if(iter->Valid()){
-        auto val = iter->value().ToString();
-        return val;
+    key += "&&";
+    s = db->Get(rocksdb::ReadOptions(), key, &value);
+    if(s.ok()){
+        return value;
     }
-    // get value
-    //s = db->Get(rocksdb::ReadOptions(), key, &value);
-    // if(s.ok()){
-    //     int pos = value.find("&&");
-    //     return value.substr(0, pos);
-    // }
     return "\0";
 }
 
 int HundunDB::Put(std::string key, std::string value){
-    if(key.find("&&") == std::string::npos){
-        if(this->DelPrefix(key) < 0){
-            return -1;
-        }
-        key += "&&";
-        key += std::to_string(GetTimeMillSeconds());
-        key += "&&";
-        s = db->Put(rocksdb::WriteOptions(), key, value);
-        if(s.ok()){
-            return 1;
-        }
-    } else{
-        auto prefix = GetPrefixFromKey(key);
-        auto time = GetTimeFromKey(key);
-        rocksdb::ReadOptions read_options;
-        read_options.total_order_seek = false;
-        read_options.prefix_same_as_start = true;
-        rocksdb::Iterator* iter = db->NewIterator(read_options);
-        prefix += "&&";
-        iter->Seek(prefix);  
-        std::string value;
-        if(iter->Valid()){
-            auto key_ = iter->key().ToString();
-            auto time_ = GetTimeFromKey(key_);
-            if(time_ < time){
-                rocksdb::WriteOptions write_options;
-                write_options.disableWAL = true;
-                db->Delete(write_options, iter->key());
-            }else{
-                return 0;
-            }
-            iter->Next();
-        }
-        s = db->Put(rocksdb::WriteOptions(), key, value);
-        if(s.ok()){
-            return 1;
-        }
+    key += "&&";
+    s = db->Put(rocksdb::WriteOptions(), key, value);
+    if(s.ok()){
+        return 0;
     }
-    
     return -1;
 }
 
@@ -113,10 +141,10 @@ int HundunDB::DelPrefix(std::string prefix){
         auto key = iter->key().ToString();
         s = db->Delete(write_options, key);
         if(!s.ok()){
-            //std::cout << "failed to delete prefix" << std::endl;
+            std::cout << "failed to delete prefix" << std::endl;
             return -1;
         }
-        //std::cout << "delete key: " << key << std::endl;
+        std::cout << "delete key: " << key << std::endl;
     }
     return 0;
 }
@@ -153,7 +181,7 @@ std::string HundunDB::Handler(std::string buf){
                 result += "-ERR syntax error\r\n";
                 continue;
             }
-            int ret = this->Put(keys[i], args[j][0]);
+            int ret = this->Put(keys[k], args[j][0]);
             if(ret < 0){
                 result += "-ERR server put error\r\n";
                 continue;
@@ -251,7 +279,8 @@ void HundunDB::Sync(){
             std::string ip = addr.substr(0, addr.find(":"));
             int port = std::stoi(addr.substr(addr.find(":") + 1));        
             uint64_t this_seq_num = iter->second;
-
+            std::cout << "master seq num " << seq_num << std::endl;
+            std::cout << "slave seq num " << this_seq_num << std::endl;
             if(seq_num > this_seq_num){
                 std::unique_ptr<rocksdb::TransactionLogIterator> log_iter;
                 s = db->GetUpdatesSince(this_seq_num, &log_iter);
@@ -276,8 +305,11 @@ void HundunDB::Sync(){
                     auto data_size = batch.writeBatchPtr->GetDataSize();
                     //TODO, support more commands...
                     std::vector<std::string> kv = GetKvPair(data, data_size);  
-                    void* ret = redisCommand(conn, "SET %s %s", kv[0], kv[1]);  
+                    std::cout << "replicatio key is " << kv[0] << std::endl;
+                    std::cout << "replication val is " << kv[1] << std::endl;
+                    void* ret = redisCommand(conn, "SET %s %s", &kv[0][0], &kv[1][0]);
                     reply = static_cast<redisReply*>(ret);
+                    std::cout << "replication reply is " << reply->str << std::endl;
                     if(reply->str == "OK"){
                         log_iter->Next();
                     } else{

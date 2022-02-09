@@ -4,13 +4,12 @@
 #include <hiredis.h>
 
 // gcc -o test_hiredis test_hiredis.c -I /usr/local/include/hiredis  -lhiredis
-int main(int argc, char **argv) {
+int main() {
      redisContext *conn;
      redisReply *reply;
 
-     const char *password = argv[3];
      struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-     conn = redisConnectWithTimeout("127.0.0.1", 9000, timeout);
+     conn = redisConnectWithTimeout("127.0.0.1", 9001, timeout);
      if (conn == NULL || conn->err) {
 	if (conn) {
              printf("Connection error: %s\n", conn->errstr);
@@ -22,9 +21,10 @@ int main(int argc, char **argv) {
         exit(1);
      }
      /* Set */
-     reply = redisCommand(conn, "slaveof no one");
+     char* key = "hello";
+     char* val = "slave";
+     reply = redisCommand(conn, "SET %s %s", key, val);
      printf("reply: %s\n", reply->str);
-     reply = redisCommand(conn, "slaveof 127.0.0.1 9000");
      freeReplyObject(reply);
      redisFree(conn);
      return 0;

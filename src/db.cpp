@@ -185,12 +185,16 @@ std::string HundunDB::Handler(std::string buf){
                 std::string local_ip = "127.0.0.1";
                 std::string this_slave_addr = local_ip + ":" + std::to_string(port);
                 std::cout << "this slave addr is " << this_slave_addr << std::endl;
-                std::string cmd = "addslave " + local_ip;
-                void* ret = redisCommand(conn, cmd);
+                std::string cmd = "addslave " + this_slave_addr;
+                void* ret = redisCommand(conn, &cmd[0]);
                 reply = static_cast<redisReply*>(ret);
-                if(reply->str == "OK"){
+                std::string result_reply(reply->str);
+                std::cout << "reply is " << result_reply << std::endl;
+                std::cout << "reply is ok: " << (result_reply == "OK") << std::endl;
+                if(result_reply == "OK"){
                     result += "+OK\r\n";
                     master_addr = new_master_addr;
+                    std::cout << "master addr is " << master_addr << std::endl;
                 } else {
                     result += "-ERR slave of error\r\n";
                 }
